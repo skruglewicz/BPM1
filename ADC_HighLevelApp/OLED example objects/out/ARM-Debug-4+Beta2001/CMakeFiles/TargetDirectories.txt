@@ -1,0 +1,4 @@
+C:/Users/skrug/source/repos/Azure_Sphere_SK_ADC_RTApp-master (2)/Azure_Sphere_SK_ADC_RTApp-master/AvnetAzureSphereSK_OLED/AvnetStarterKitReferenceDesign/out/ARM-Debug-4+Beta2001/CMakeFiles/Avnet-Starter-Kit-reference.dir
+C:/Users/skrug/source/repos/Azure_Sphere_SK_ADC_RTApp-master (2)/Azure_Sphere_SK_ADC_RTApp-master/AvnetAzureSphereSK_OLED/AvnetStarterKitReferenceDesign/out/ARM-Debug-4+Beta2001/CMakeFiles/MakeImage.dir
+C:/Users/skrug/source/repos/Azure_Sphere_SK_ADC_RTApp-master (2)/Azure_Sphere_SK_ADC_RTApp-master/AvnetAzureSphereSK_OLED/AvnetStarterKitReferenceDesign/out/ARM-Debug-4+Beta2001/CMakeFiles/edit_cache.dir
+C:/Users/skrug/source/repos/Azure_Sphere_SK_ADC_RTApp-master (2)/Azure_Sphere_SK_ADC_RTApp-master/AvnetAzureSphereSK_OLED/AvnetStarterKitReferenceDesign/out/ARM-Debug-4+Beta2001/CMakeFiles/rebuild_cache.dir
