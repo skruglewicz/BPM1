@@ -1,5 +1,11 @@
 # Beats Per Minute (High-level app)
 
+THis is a direct port to main.c from the src code in 
+PulseSensor_times.c
+
+The MyBPM project numbers numbers were much diffent from the code running on my Rasberry PI 4
+
+
 This application demonstrates how I connected a Heart Rate Sensor to the Avnet MT3620 high-level core  and display Beats Per Minute on an attached OLED Display.
 The application samples and displays the output from The heart Rate sensor once per second. It uses the MT3620 analog-to-digital converter (ADC) to sample the signal.
 

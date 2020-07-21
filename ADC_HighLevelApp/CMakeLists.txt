@@ -6,7 +6,7 @@ PROJECT(ADC_HighLevelApp C)
 
 # Create executable
 #ADD_EXECUTABLE(${PROJECT_NAME} main.c eventloop_timer_utilities.c)
-ADD_EXECUTABLE(${PROJECT_NAME} main.c oled.c sd1306.c i2c.c eventloop_timer_utilities.c)
+ADD_EXECUTABLE(${PROJECT_NAME} main.c oled.c sd1306.c i2c.c eventloop_timer_utilities.c )
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} applibs pthread gcc_s c)
 
 # Add MakeImage post-build command

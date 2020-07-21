@@ -8,126 +8,22 @@
         MIT FLAVOR OF LICENSE
 
 */
-#include <errno.h>
-#include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-//- #include <sys/stat.h>
-//#include <sys/types.h>
+//-#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <signal.h>
 #include <time.h>
 //-#include <wiringPi.h>
 //-#include <mcp3004.h>
 
-//#include <errno.h>
-//#include <signal.h>
-//#include <stdbool.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <time.h>
-//#include <unistd.h>
-
-//SAK added for 
-//// OLED support
-//// modified to add bpm support
-////created Authors:
-////Peter Fenn(Avnet Engineering& Technology)
-////Brian Willess(Avnet Engineering& Technology)
-
-#include "oled.h"
-
-
-// applibs_versions.h defines the API struct versions to use for applibs APIs.
-#include "applibs_versions.h"
-#include <applibs/adc.h>
-#include <applibs/log.h>
-
-//SAK 1-26-2020     Added LED Support
-#include <applibs/gpio.h>
-
-// By default, this sample's CMake build targets hardware that follows the MT3620
-// Reference Development Board (RDB) specification, such as the MT3620 Dev Kit from
-// Seeed Studios.
-//
-// To target different hardware, you'll need to update the CMake build. The necessary
-// steps to do this vary depending on if you are building in Visual Studio, in Visual
-// Studio Code or via the command line.
-//
-// See https://github.com/Azure/azure-sphere-samples/tree/master/Hardware for more details.
-//
-// This #include imports the sample_hardware abstraction from that hardware definition.
-#include <hw/sample_hardware.h>
-
-#include "eventloop_timer_utilities.h"
-
-/// <summary>
-/// Exit codes for this application. These are used for the
-/// application exit code.  They they must all be between zero and 255,
-/// where zero is reserved for successful termination.
-/// </summary>
-typedef enum {
-    ExitCode_Success = 0,
-
-    ExitCode_TermHandler_SigTerm = 1,
-
-    ExitCode_AdcTimerHandler_Consume = 2,
-    ExitCode_AdcTimerHandler_Poll = 3,
-
-    ExitCode_Init_EventLoop = 4,
-    ExitCode_Init_AdcOpen = 5,
-    ExitCode_Init_GetBitCount = 6,
-    ExitCode_Init_UnexpectedBitCount = 7,
-    ExitCode_Init_SetRefVoltage = 8,
-    ExitCode_Init_AdcPollTimer = 9,
-
-    ExitCode_Main_EventLoopFail = 10,
-    ExitCode_Init_GPIO_OpenAsOutput = 11
-
-} ExitCode;
-
-// File descriptors - initialized to invalid value
-static int adcControllerFd = -1;
-
-static EventLoop* eventLoop = NULL;
-static EventLoopTimer* adcPollTimer = NULL;
-
-static int fd; //SAK 1-26-2020     Added LED Support
-
-// The size of a sample in bits
-static int sampleBitCount = -1;
-
-// The maximum voltage
-static float sampleMaxVoltage = 2.5f;
-
-// Termination state
-static volatile sig_atomic_t exitCode = ExitCode_Success;
-
-static void TerminationHandler(int signalNumber);
-static void AdcPollingEventHandler(EventLoopTimer* timer);
-static ExitCode InitPeripheralsAndHandlers(void);
-static void CloseFdAndPrintError(int fd, const char* fdName);
-static void ClosePeripheralsAndHandlers(void);
-
-////SAK 4-29-2020 -- Added from ported code PulseSensor_timer.c
-
-// FUNCTION PROTOTYPES (porte from code PulseSensor_timer.c)
-//void getPulse(uint32_t sig_num);
-void initPulseSensorVariables(void);
-
-
-// defined in i2c.c
-int initI2c(void);
 
 #define OPT_R 10        // min uS allowed lag btw alarm and callback
-
 #define OPT_U 2000      // sample time uS between alarms
-//#define OPT_U .002
-#define OPT_U_Seconds 1/// SAK passed to alarm() because it wont take microseconds!!
-
 #define OPT_O_ELAPSED 0 // output option uS elapsed time between alarms
 #define OPT_O_JITTER 1  // output option uS jitter (elapsed time - sample time)
 #define OPT_O 1         // defaoult output option
@@ -164,11 +60,7 @@ volatile int firstBeat = 1;                      // set these to avoid noise
 volatile int secondBeat = 0;                    // when we get the heartbeat back
 volatile int QS = 0;
 volatile int rate[10];
-
-extern int BPM = 0;
-//volatile int BPM = 0;
-int OldBpm = 0;
-
+volatile int BPM = 0;
 volatile int IBI = 600;                  // 600ms per beat = 100 Beats Per Minute (BPM)
 volatile int Pulse = 0;
 volatile int amp = 100;                  // beat amplitude 1/10 of input range.
@@ -196,6 +88,15 @@ FILE* data;
 unsigned int micros(void);
 
 
+/**
+ * Returns the current time in microseconds.
+ */
+unsigned int micros(void) {
+    struct timeval currentTime;
+    gettimeofday(&currentTime, NULL);
+    return currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
+}
+
 void usage()
 {
     fprintf
@@ -213,30 +114,30 @@ void usage()
 }
 
 void sigHandler(int sig_num) {
-    Log_Debug("\nkilling timer\n");
+    printf("\nkilling timer\n");
     startTimer(OPT_R, 0); // kill the alarm
     exit(EXIT_SUCCESS);
 }
 
 void fatal(int show_usage, char* fmt, ...)
 {
-    //char buf[128];
-    //va_list ap;
-    //char kill[20];
+    char buf[128];
+    va_list ap;
+    char kill[20];
 
-    //va_start(ap, fmt);
-    //vsnprintf(buf, sizeof(buf), fmt, ap);
-    //va_end(ap);
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
 
-    ////fprintf(stderr, "%s\n", buf);
+    fprintf(stderr, "%s\n", buf);
 
-    //if (show_usage) usage();
+    if (show_usage) usage();
 
-    //fflush(stderr);
-    //Log_Debug("killing timer\n");
-    //startTimer(OPT_R, 0); // kill the alarm
-    ////fprintf(data, "#%s", fmt);
-    //fclose(data);
+    fflush(stderr);
+    printf("killing timer\n");
+    startTimer(OPT_R, 0); // kill the alarm
+    fprintf(data, "#%s", fmt);
+    fclose(data);
 
     exit(EXIT_FAILURE);
 }
@@ -280,12 +181,10 @@ int main(int argc, char* argv[])
     //piHiPri(99);
     //- mcp3004Setup(BASE, SPI_CHAN);    // setup the mcp3004 library
     //- pinMode(BLINK_LED, OUTPUT); digitalWrite(BLINK_LED, LOW);
-    
-    Log_Debug("ADC application starting.\n");
-    exitCode = InitPeripheralsAndHandlers();
+
     initPulseSensorVariables();  // initilaize Pulse Sensor beat finder
 
-    startTimer(OPT_R, OPT_U_Seconds);   // start sampling
+    startTimer(OPT_R, OPT_U);   // start sampling
 
 
     while (1)
@@ -293,52 +192,21 @@ int main(int argc, char* argv[])
         if (sampleFlag) {
             sampleFlag = 0;
             timeOutStart = micros();
-
             //- digitalWrite(BLINK_LED, Pulse);
-            ////SAK 1-26-2020     Added LED Support
-            // Red LED OFF
-            //GPIO_SetValue(fd, GPIO_Value_High);
-            GPIO_SetValue(fd, Pulse);
-
             // PRINT DATA TO TERMINAL
-            Log_Debug("%lu\t%d\t%d\t%d\t%d\n",
+            printf("%lu\t%d\t%d\t%d\t%d\n",
                 sampleCounter, Signal, BPM, IBI, jitter
                 );
-            
-            //// PRINT DATA TO FILE
-            //fprintf(data, "%d\t%d\t%d\t%d\t%d\t%d\n",
-            //    sampleCounter, Signal, IBI, BPM, jitter, duration
-            //    );
-
-            ////sak added another  alarm
-            //startTimer(OPT_R, OPT_U);   // start sampling
+            // PRINT DATA TO FILE
+            fprintf(data, "%d\t%d\t%d\t%d\t%d\t%d\n",
+                sampleCounter, Signal, IBI, BPM, jitter, duration
+                );
         }
         if ((micros() - timeOutStart) > TIME_OUT) {
             fatal(0, "0-program timed out", 0);
         }
-
-        //SAK Display the BPM if it has changed
-        if ((BPM != 0) && OldBpm != BPM)
-        {
-
-            ////SAK 1-26-2020     Added LED Support
-            // Red LED OFF/ON
-            //digitalWrite(BLINK_LED, Pulse);
-            GPIO_SetValue(fd, GPIO_Value_Low);// ON
-            oled_state = 8;
-            update_oled();
-            OldBpm = BPM;
-
-            //Sleep for a blink
-            struct timespec sleepTime = { 0, 600000 };
-            nanosleep(&sleepTime, NULL);
-
-            //turn OFF the led
-            GPIO_SetValue(fd, GPIO_Value_High); //OFF
-        }
     }
 
-    Log_Debug("Application exiting.\n");
     return 0;
 
 }//int main(int argc, char *argv[])
@@ -347,21 +215,18 @@ void startTimer(int r, unsigned int u) {
     int latency = r;
     unsigned int micros = u;
 
-    //signal(SIGALRM, getPulse);///NOT HERE? PLACED BELOW
-    //////- WHAT IS ualarm() use alarm() sets an alarm to go off in microseconds
-            
-    //int err = ualarm(latency, micros);
-    int err = alarm(micros);
-    if (err == 0) {
-        if (micros > 0) {
-            Log_Debug("alarm ON\n");
-        }
-        else {
-            Log_Debug("alarm OFF\n");
-        }
-    }
-
     signal(SIGALRM, getPulse);
+    //////- WHAT IS ualarm()
+    ////int err = ualarm(latency, micros);
+    ////if (err == 0) {
+    ////    if (micros > 0) {
+    ////        printf("ualarm ON\n");
+    ////    }
+    ////    else {
+    ////        printf("ualarm OFF\n");
+    ////    }
+    ////}
+
 }
 
 void initPulseSensorVariables(void) {
@@ -385,138 +250,19 @@ void initPulseSensorVariables(void) {
     timeOutStart = lastTime;
 }
 
-
-/// SAK Added these functions from myBPM project 
-
-
-/**
- * Returns the current time in microseconds.
- */
-#include <sys/time.h>
-unsigned int micros(void) {
-    struct timeval currentTime;
-    gettimeofday(&currentTime, NULL);
-    return currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
-}
-
-/// <summary>
-///     // Set up SIGTERM termination handler, initialize peripherals, and set up event handlers.
-///     
-/// </summary>
-/// <returns>ExitCode_Success if all resources were allocated successfully; otherwise another
-/// ExitCode value which indicates the specific failure.</returns>
-static ExitCode InitPeripheralsAndHandlers(void)
-{
-    //struct sigaction action;
-    //memset(&action, 0, sizeof(struct sigaction));
-    //action.sa_handler = TerminationHandler;
-    //sigaction(SIGTERM, &action, NULL);
-
- 
-
-    if (initI2c() == -1) {
-        return -1;
-    }
-
-    // Draw AVNET logo
-    //oled_draw_logo();
-    //sak oled oled_i2c_bus_status(0);
-    ////// OLED
-    oled_state = 7;
-    update_oled();
-
-    // put a 0 on the display
-    oled_state = 8;
-    update_oled();
-
-    //SAK 1-26-2020     Added LED Support
-    // Change this GPIO number and the number in app_manifest.json if required by your hardware.
-    //Red LED Is GPIO 8
-    fd = GPIO_OpenAsOutput(8, GPIO_OutputMode_PushPull, GPIO_Value_High);
-    if (fd < 0) {
-        Log_Debug(
-            "Error opening GPIO: %s (%d). Check that app_manifest.json includes the GPIO used.\n",
-            strerror(errno), errno);
-        return ExitCode_Init_GPIO_OpenAsOutput;
-    }
-
-    //// NO NEED TO CREATE A Eventloop
-    //eventLoop = EventLoop_Create();
-    //if (eventLoop == NULL) {
-    //    Log_Debug("Could not create event loop.\n");
-    //    return ExitCode_Init_EventLoop;
-    //}
-
-
-    //Sphere ADC INIT
-
-    adcControllerFd = ADC_Open(SAMPLE_POTENTIOMETER_ADC_CONTROLLER);
-    if (adcControllerFd < 0) {
-        Log_Debug("ADC_Open failed with error: %s (%d)\n", strerror(errno), errno);
-        return ExitCode_Init_AdcOpen;
-    }
-
-    sampleBitCount = ADC_GetSampleBitCount(adcControllerFd, SAMPLE_POTENTIOMETER_ADC_CHANNEL);
-    if (sampleBitCount == -1) {
-        Log_Debug("ADC_GetSampleBitCount failed with error : %s (%d)\n", strerror(errno), errno);
-        return ExitCode_Init_GetBitCount;
-    }
-    if (sampleBitCount == 0) {
-        Log_Debug("ADC_GetSampleBitCount returned sample size of 0 bits.\n");
-        return ExitCode_Init_UnexpectedBitCount;
-    }
-
-    int result = ADC_SetReferenceVoltage(adcControllerFd, SAMPLE_POTENTIOMETER_ADC_CHANNEL,
-        sampleMaxVoltage);
-    if (result < 0) {
-        Log_Debug("ADC_SetReferenceVoltage failed with error : %s (%d)\n", strerror(errno), errno);
-        return ExitCode_Init_SetRefVoltage;
-    }
-
-
-     
-    //// sak 5-21-2020 need to check on microseconds not seconds
-    ////  1 microsecond is 1000 nanoseconds
-    ////  1 nanosecond is 0.001 microseconds
-    ////struct timespec adcCheckPeriod = { .tv_sec = 0, .tv_nsec = 600000 };
-
-    //struct timespec adcCheckPeriod = {.tv_sec = 1, .tv_nsec = 0};
-    //adcPollTimer =
-    //    CreateEventLoopPeriodicTimer(eventLoop, &AdcPollingEventHandler, &adcCheckPeriod);
-    //if (adcPollTimer == NULL) {
-    //    return ExitCode_Init_AdcPollTimer;
-    //}
-
-    return ExitCode_Success;
-}
-
-
-
 void getPulse(int sig_num) {
-    Log_Debug("IN GetPulse; sig_num = %d\n", sig_num);
+
     if (sig_num == SIGALRM)
     {
         thisTime = micros();
-
         //- Signal = analogRead(BASE);
-
-        /// <summary>
-        /// Added new sak 6-25-2020
-        uint32_t value;
-        int result = ADC_Poll(adcControllerFd, SAMPLE_POTENTIOMETER_ADC_CHANNEL, &value);
-        if (result == -1) {
-            Log_Debug("ADC_Poll failed with error: %s (%d)\n", strerror(errno), errno);
-            exitCode = ExitCode_AdcTimerHandler_Poll;
-            return;
-        }
-
-        Signal = result;
-
         elapsedTime = thisTime - lastTime;
         lastTime = thisTime;
         jitter = elapsedTime - OPT_U;
         sumJitter += jitter;
         sampleFlag = 1;
+
+
         sampleCounter += 2;         // keep track of the time in mS with this variable
         int N = sampleCounter - lastBeatTime;      // monitor the time since the last beat to avoid noise
 
